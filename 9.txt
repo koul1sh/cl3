@@ -1,0 +1,39 @@
+from mrjob.job import MRJob
+from mrjob.step import MRStep
+
+class MRWeatherAnalysis(MRJob):
+
+    def steps(self):
+        return [
+            MRStep(mapper=self.mapper_get_temps,reducer=self.reducer_avg_temp),
+            MRStep(reducer=self.reducer_find_extremes)
+        ]
+
+    def mapper_get_temps(self, _, line):
+
+        try:
+            year, temp = line.strip().split(",")
+            yield year, float(temp)
+        except:
+            pass  # Ignore malformed lines
+
+    def reducer_avg_temp(self, year, temps):
+        temps = list(temps)
+        avg = sum(temps) / len(temps)
+        yield "avg", (year, avg)
+
+    def reducer_find_extremes(self, key, year_avg_pairs):
+        coolest = None
+        hottest = None
+
+        for year, avg in year_avg_pairs:
+            if coolest is None or avg < coolest[1]:
+                coolest = (year, avg)
+            if hottest is None or avg > hottest[1]:
+                hottest = (year, avg)
+
+        yield "Coolest Year", coolest
+        yield "Hottest Year", hottest
+
+if __name__ == '__main__':
+    MRWeatherAnalysis.run()
